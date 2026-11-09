@@ -4,6 +4,8 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.ViewGroup
 import android.view.View
 import android.widget.LinearLayout
@@ -12,6 +14,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.questions.data.Categories
 import com.example.questions.data.Category
+import com.example.questions.data.AiQuestionClient
 import com.example.questions.data.FavoritesStorage
 import com.example.questions.data.Question
 import com.example.questions.data.QuestionRepository
@@ -26,6 +29,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var categoryContainer: LinearLayout
 
     private val chips = mutableMapOf<Category, TextView>()
+    private lateinit var randomButton: TextView
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var selected = Categories.all
     private var current: Question = QuestionRepository.daily()
     private var isDaily = true
@@ -43,7 +48,8 @@ class MainActivity : AppCompatActivity() {
 
         buildCategoryButtons()
 
-        findViewById<TextView>(R.id.randomButton).setOnClickListener { showRandom() }
+        randomButton = findViewById(R.id.randomButton)
+        randomButton.setOnClickListener { requestAiQuestion() }
         findViewById<TextView>(R.id.dailyButton).setOnClickListener {
             current = QuestionRepository.daily()
             isDaily = true
@@ -84,17 +90,68 @@ class MainActivity : AppCompatActivity() {
             chip.layoutParams = params
             chip.setOnClickListener {
                 selected = category
-                showRandom()
+                requestAiQuestion()
             }
             categoryContainer.addView(chip)
             chips[category] = chip
         }
     }
 
-    private fun showRandom() {
-        current = QuestionRepository.random(selected, current)
-        isDaily = false
-        showQuestion(true)
+    private fun requestAiQuestion() {
+        randomButton.isEnabled = false
+        randomButton.text = "ИИ генерирует вопрос…"
+
+        // Запоминаем выбранную категорию
+        val requestedCategory = selected
+
+        val categoryName =
+            if (requestedCategory == Categories.all) {
+                "Общие знания"
+            } else {
+                requestedCategory.name
+            }
+
+        Thread {
+            try {
+                // Запрос к серверу
+                val generated = AiQuestionClient.generate(categoryName, 3)
+
+                // Проверяем ответ сервера
+                val questionFromAi = generated.firstOrNull()
+                    ?: throw Exception("Сервер не вернул вопросы")
+
+                mainHandler.post {
+                    current = Question(questionFromAi, requestedCategory)
+                    isDaily = false
+
+                    showQuestion(true)
+
+                    randomButton.isEnabled = true
+                    randomButton.text = "Случайный вопрос"
+                }
+
+            } catch (error: Exception) {
+
+                mainHandler.post {
+                    randomButton.isEnabled = true
+                    randomButton.text = "Случайный вопрос"
+
+                    Toast.makeText(
+                        this,
+                        "Ошибка ИИ: ${error.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+
+                    current = QuestionRepository.random(
+                        requestedCategory,
+                        current
+                    )
+
+                    isDaily = false
+                    showQuestion(true)
+                }
+            }
+        }.start()
     }
 
     private fun showQuestion(animate: Boolean) {
