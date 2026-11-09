@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         Thread {
             try {
                 // Запрос к серверу
-                val generated = AiQuestionClient.generate(categoryName, 3)
+                val generated = AiQuestionClient.generate(categoryName, 1)
 
                 // Проверяем ответ сервера
                 val questionFromAi = generated.firstOrNull()

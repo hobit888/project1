@@ -7,7 +7,7 @@ import java.net.URL
 object AiQuestionClient {
     private const val SERVER_URL = "http://10.0.2.2:3000/generate"
 
-    fun generate(category: String, count: Int = 3): List<String> {
+    fun generate(category: String, count: Int = 1): List<String> {
         val connection = (URL(SERVER_URL).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15_000
